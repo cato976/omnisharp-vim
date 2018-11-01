@@ -71,7 +71,11 @@ function! OmniSharp#BuildAsync() abort
   python3 buildcommand()
   let &l:makeprg=b:buildcommand
   setlocal errorformat=\ %#%f(%l\\\,%c):\ %m
-  Make
+  if has("nvim")
+    Neomake!
+  else
+    Make
+  endif
 endfunction
 
 function! OmniSharp#RunTests(mode) abort
@@ -106,7 +110,11 @@ function! OmniSharp#RunTests(mode) abort
   \%C%.%#
   set errorformat+=\ %#%f(%l\\\,%c):\ %m
   "\%C%#%f(%l\\\,%c):\ %m,%m\ in\ %#%f:%l
-  Make
+  if has("nvim")
+    Neomake!
+  else
+    Make
+  endif
   let &cmdheight = s:cmdheight
 endfunction
 
