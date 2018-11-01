@@ -68,7 +68,7 @@ function! OmniSharp#BuildAsync() abort
   "else
   "  echo 'No build command found'
   "endif
-  python buildcommand()
+  python3 buildcommand()
   let &l:makeprg=b:buildcommand
   setlocal errorformat=\ %#%f(%l\\\,%c):\ %m
   Make
@@ -76,10 +76,10 @@ endfunction
 
 function! OmniSharp#RunTests(mode) abort
   wall
-  python buildcommand()
+  python3 buildcommand()
 
   if a:mode !=# 'last'
-    python getTestCommand()
+    python3 getTestCommand()
   endif
 
   let s:cmdheight=&cmdheight
@@ -92,12 +92,19 @@ function! OmniSharp#RunTests(mode) abort
   endif
   let &l:makeprg=b:dispatch
   "errorformat=msbuild,nunit stack trace
-  setlocal errorformat=
+  setlocal errorformat+=
   \%E%n)\ Error\ :\ %m,
   \%C%m\ :\ %s\Failure,
   \%C\ \ \ at\ %s)\ in\ %f:line\ %l,
   \%Z\n,
   \%C%.%#
+  set errorformat+=
+  \%EError\ Message:,
+  \%C\ %m\nStack\ Trace:\n,
+  \%C\ \ \ at\ %s\ in\ %f:line\ %l,
+  \%Z\n,
+  \%C%.%#
+  set errorformat+=\ %#%f(%l\\\,%c):\ %m
   "\%C%#%f(%l\\\,%c):\ %m,%m\ in\ %#%f:%l
   Make
   let &cmdheight = s:cmdheight
