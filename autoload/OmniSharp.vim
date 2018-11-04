@@ -103,10 +103,14 @@ function! OmniSharp#RunTests(mode) abort
   \%Z\n,
   \%C%.%#
   set errorformat+=
-  \%EError\ Message:,
-  \%C\ %m\nStack\ Trace:\n,
-  \%C\ \ \ at\ %s\ in\ %f:line\ %l,
-  \%Z\n,
+  \%+EError\ Message:,
+  \%CStack\ Trace:,
+  \%+C\ \ \ Expected:%m,
+  \%+C\ \ But%m,
+  \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
+  \%C%.%#
+  set errorformat+=
+  \%+WSkipped%m,
   \%C%.%#
   set errorformat+=\ %#%f(%l\\\,%c):\ %m
   "\%C%#%f(%l\\\,%c):\ %m,%m\ in\ %#%f:%l
