@@ -95,7 +95,6 @@ function! OmniSharp#RunTests(mode) abort
 	let b:dispatch .= ' '
   endif
   let &l:makeprg=b:dispatch
-  "errorformat=msbuild,nunit stack trace
   setlocal errorformat+=
   \%E%n)\ Error\ :\ %m,
   \%C%m\ :\ %s\Failure,
@@ -111,6 +110,12 @@ function! OmniSharp#RunTests(mode) abort
   \%C%.%#
   set errorformat+=
   \%+WSkipped%m,
+  \%C%.%#
+  set errorformat+=
+  \%+E%n)\ Failed\ :\ %m,
+  \%+C\ \ Expected:\ %m,
+  \%+C\ \ But\ %m,
+  \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
   \%C%.%#
   set errorformat+=\ %#%f(%l\\\,%c):\ %m
   "\%C%#%f(%l\\\,%c):\ %m,%m\ in\ %#%f:%l
