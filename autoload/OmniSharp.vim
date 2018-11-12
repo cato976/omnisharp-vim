@@ -464,7 +464,11 @@ endfunction
 
 function! OmniSharp#RenameTo(renameto) abort
   let command = printf('renameTo(%s)', string(a:renameto))
-  let changes = OmniSharp#py#eval(command)
+  if has('nvim')
+    let changes = OmniSharp#py#eval(command)
+  else
+    let changes = OmniSharp#py#eval(command)
+  endif
   if OmniSharp#CheckPyError() | return | endif
 
   let save_lazyredraw = &lazyredraw
