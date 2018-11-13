@@ -104,8 +104,8 @@ function! OmniSharp#RunTests(mode) abort
   set errorformat+=
   \%+EError\ Message:,
   \%CStack\ Trace:,
-  \%+C\ \ \ Expected:%m,
-  \%+C\ \ But%m,
+  \%+C\ \ Expected:%m,
+  \%+C\ \ But%s,
   \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
   \%C%.%#
   set errorformat+=
@@ -113,6 +113,12 @@ function! OmniSharp#RunTests(mode) abort
   \%C%.%#
   set errorformat+=
   \%+E%n)\ Failed\ :\ %m,
+  \%+C\ \ Expected:\ %m,
+  \%+C\ \ But\ %m,
+  \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
+  \%C%.%#
+  set errorformat+=
+  \%+E%n)%sFailed\ :\ %m,
   \%+C\ \ Expected:\ %m,
   \%+C\ \ But\ %m,
   \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
