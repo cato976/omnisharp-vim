@@ -101,17 +101,16 @@ function! OmniSharp#RunTests(mode) abort
   \%C\ \ \ at\ %s)\ in\ %f:line\ %l,
   \%Z\n,
   \%C%.%#
+  set errorformat+=\%m\ in\ %#%f:line\ %l
   set errorformat+=
   \%+WSkipped%m,
   set errorformat+=
-  \%+EError\ Message:,
-  \%+C\ %m\ Failure,
+  \%+E\ %m\ Failure,
   \%CStack\ Trace:,
   \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
   \%C%.%#
   set errorformat+=
-  \%+EError\ Message:,
-  \%CStack\ Trace:,
+  \%E+Stack\ Trace:,
   \%+C\ \ Expected:%m,
   \%+C\ \ But%s,
   \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
@@ -128,8 +127,6 @@ function! OmniSharp#RunTests(mode) abort
   \%+C\ \ But\ %m,
   \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
   \%C%.%#
-  set errorformat+=\ %#%f(%l\\\,%c):\ %m
-  "\%C%#%f(%l\\\,%c):\ %m,%m\ in\ %#%f:%l
   if has("nvim")
     Neomake!
   else
