@@ -105,8 +105,8 @@ function! OmniSharp#RunTests(mode) abort
   set errorformat+=
   \%+WSkipped%m,
   set errorformat+=
-  \%+E\ %m\ Failure,
-  \%CStack\ Trace:,
+  \%+E%m\ :\ %s,
+  \%+CStack\ Trace:,
   \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
   \%C%.%#
   set errorformat+=
