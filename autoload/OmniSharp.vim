@@ -70,7 +70,8 @@ function! OmniSharp#BuildAsync() abort
   "endif
   python3 buildcommand()
   let &l:makeprg=b:buildcommand
-  setlocal errorformat=\ %#%f(%l\\\,%c):\ %m
+  setlocal errorformat=%f(%l\\\,%c):\ %trror%m
+
   if has("nvim")
     Neomake!
   else
@@ -91,7 +92,7 @@ function! OmniSharp#RunTests(mode) abort
   let b:dispatch = b:buildcommand . ' && ' . s:testcommand
   if executable('sed')
     " don't match on <filename unknown>:0
-    "let b:dispatch .= ' | sed "s/:0//"'
+    let b:dispatch .= ' | sed "s/:0//"'
 	let b:dispatch .= ' '
   endif
   let &l:makeprg=b:dispatch
@@ -101,11 +102,12 @@ function! OmniSharp#RunTests(mode) abort
   \%C\ \ \ at\ %s)\ in\ %f:line\ %l,
   \%Z\n,
   \%C%.%#
-  set errorformat+=\%m\ in\ %#%f:line\ %l
+  set errorformat+=\%E%m\ in\ %#%f:line\ %l
   set errorformat+=
   \%+WSkipped%m,
   set errorformat+=
   \%+E%m\ :\ %s,
+  \%+E%n)%m\ :\ %s,
   \%+CStack\ Trace:,
   \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
   \%C%.%#
@@ -116,17 +118,12 @@ function! OmniSharp#RunTests(mode) abort
   \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
   \%C%.%#
   set errorformat+=
-  \%+E%n)\ Failed\ :\ %m,
-  \%+C\ \ Expected:\ %m,
-  \%+C\ \ But\ %m,
-  \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
-  \%C%.%#
-  set errorformat+=
   \%+E%n)%sFailed\ :\ %m,
   \%+C\ \ Expected:\ %m,
   \%+C\ \ But\ %m,
   \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
   \%C%.%#
+  set errorformat+=%f(%l\\\,%c):\ %trror%m
   if has("nvim")
     Neomake!
   else
