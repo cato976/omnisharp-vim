@@ -96,34 +96,9 @@ function! OmniSharp#RunTests(mode) abort
 	let b:dispatch .= ' '
   endif
   let &l:makeprg=b:dispatch
-  setlocal errorformat+=
-  \%E%n)\ Error\ :\ %m,
-  \%C%m\ :\ %s\Failure,
-  \%C\ \ \ at\ %s)\ in\ %f:line\ %l,
-  \%Z\n,
-  \%C%.%#
-  set errorformat+=\%E%m\ in\ %#%f:line\ %l
-  set errorformat+=
-  \%+WSkipped%m,
-  set errorformat+=
-  \%+E%m\ :\ %s,
-  \%+E%n)%m\ :\ %s,
-  \%+CStack\ Trace:,
-  \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
-  \%C%.%#
-  set errorformat+=
-  \%E+Stack\ Trace:,
-  \%+C\ \ Expected:%m,
-  \%+C\ \ But%s,
-  \%Z\ \ \ at\ %s\ in\ %f:line\ %l,
-  \%C%.%#
-  set errorformat+=
-  \%+E%n)%sFailed\ :\ %m,
-  \%+C\ \ Expected:\ %m,
-  \%+C\ \ But\ %m,
-  \%Z\ \ \ at\ %m\ in\ %f:line\ %l,
-  \%C%.%#
-  set errorformat+=%f(%l\\\,%c):\ %trror%m
+  set errorformat=%E%m\ in\ %#%f:line\ %l
+  set errorformat+=%+W%n\)\ Ignored\ :%m
+
   if has("nvim")
     Neomake!
   else
