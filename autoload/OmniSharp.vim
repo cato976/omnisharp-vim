@@ -68,53 +68,51 @@ function! OmniSharp#GetHost(...) abort
 endfunction
 
 function! OmniSharp#BuildAsync() abort
-  "let qf_taglist = OmniSharp#py#eval('buildcommand()')
-  "if OmniSharp#CheckPyError() | return | endif
+  call OmniSharp#py#eval('buildcommand()')
+  let b:buildcommand = OmniSharp#py#eval('buildcommand()')[0]['text']
+  if OmniSharp#CheckPyError() | return | endif
+  if len(b:buildcommand) > 0
+    let &l:makeprg=b:buildcommand
+    setlocal errorformat=%f(%l\\\,%c):\ %trror%m
 
-  " Place the tags in the quickfix window, if possible
-  "if len(qf_taglist) > 0
-  "  call s:set_quickfix(qf_taglist, 'Build: '.expand('<cword>'))
-  "else
-  "  echo 'No build command found'
+    if has("nvim")
+      Neomake!
+    else
+      Make
+    endif
+  else
+    echo 'No build command found'
+  endif
+  "Place the tags in the quickfix window, if possible
+endfunction
+
+"function! OmniSharp#RunTests(mode) abort
+  "wall
+  "python3 buildcommand()
+
+  "if a:mode !=# 'last'
+    "python3 getTestCommand()
   "endif
-  python3 buildcommand()
-  let &l:makeprg=b:buildcommand
-  setlocal errorformat=%f(%l\\\,%c):\ %trror%m
 
-  if has("nvim")
-    Neomake!
-  else
-    Make
-  endif
-endfunction
+  "let s:cmdheight=&cmdheight
+  "set cmdheight=5
+  "let b:dispatch = b:buildcommand . ' && ' . s:testcommand
+  "if executable('sed')
+    "" don't match on <filename unknown>:0
+    "let b:dispatch .= ' | sed "s/:0//"'
+	"let b:dispatch .= ' '
+  "endif
+  "let &l:makeprg=b:dispatch
+  "set errorformat=%E%m\ in\ %#%f:line\ %l
+  "set errorformat+=%+W%n\)\ Ignored\ :%m
 
-function! OmniSharp#RunTests(mode) abort
-  wall
-  python3 buildcommand()
-
-  if a:mode !=# 'last'
-    python3 getTestCommand()
-  endif
-
-  let s:cmdheight=&cmdheight
-  set cmdheight=5
-  let b:dispatch = b:buildcommand . ' && ' . s:testcommand
-  if executable('sed')
-    " don't match on <filename unknown>:0
-    let b:dispatch .= ' | sed "s/:0//"'
-	let b:dispatch .= ' '
-  endif
-  let &l:makeprg=b:dispatch
-  set errorformat=%E%m\ in\ %#%f:line\ %l
-  set errorformat+=%+W%n\)\ Ignored\ :%m
-
-  if has("nvim")
-    Neomake!
-  else
-    Make
-  endif
-  let &cmdheight = s:cmdheight
-endfunction
+  "if has("nvim")
+    "Neomake!
+  "else
+    "Make
+  "endif
+  "let &cmdheight = s:cmdheight
+"endfunction
 
 function! OmniSharp#GetCompletions(partial, ...) abort
   let opts = a:0 ? { 'Callback': a:1 } : {}
@@ -636,22 +634,47 @@ function! s:CBGlobalCodeCheck(quickfixes) abort
 endfunction
 
 function! OmniSharp#RunTestsInFile(...) abort
-  if !s:GuardStdio() | return | endif
+  "if !s:GuardStdio() | return | endif
   if g:OmniSharp_translate_cygwin_wsl
     echohl WarningMsg
     echom 'Tests do not work in WSL unfortunately'
     echohl None
     return
   endif
-  if a:0 == 0
-    let files = [expand('%:p')]
-  elseif type(a:1) == type([])
-    let files = a:1
-  elseif type(a:1) == type('')
-    let files = a:000
+  if g:OmniSharp_server_stdio
+    if a:0 == 0
+      let files = [expand('%:p')]
+    elseif type(a:1) == type([])
+      let files = a:1
+    elseif type(a:1) == type('')
+      let files = a:000
+    endif
+    let files = map(copy(files), {i,f -> fnamemodify(f, ':p')})
+    call OmniSharp#stdio#RunTestsInFile(files, function('s:CBRunTestsInFile'))
+  else
+    let b:buildcommand = OmniSharp#py#eval('buildcommand()')[0]['text']
+    if OmniSharp#CheckPyError() | return | endif
+    let s:testcommand = OmniSharp#py#eval('getTestCommand("fixture")')
+    if OmniSharp#CheckPyError() | return | endif
+    let s:cmdheight=&cmdheight
+    set cmdheight=5
+    let b:dispatch = b:buildcommand . ' && ' . s:testcommand
+    if executable('sed')
+      "" don't match on <filename unknown>:0
+      "let b:dispatch .= ' | sed "s/:0//"'
+      "let b:dispatch .= ' '
+    endif
+    let &l:makeprg=b:dispatch
+    set errorformat=%E%m\ in\ %#%f:line\ %l
+    set errorformat+=%+W%n\)\ Ignored\ :%m
+
+    if has("nvim")
+      Neomake!
+    else
+      Make
+    endif
+    let &cmdheight = s:cmdheight
   endif
-  let files = map(copy(files), {i,f -> fnamemodify(f, ':p')})
-  call OmniSharp#stdio#RunTestsInFile(files, function('s:CBRunTestsInFile'))
 endfunction
 
 function! s:CBRunTestsInFile(summary) abort
@@ -681,15 +704,42 @@ function! s:CBRunTestsInFile(summary) abort
   call s:SetQuickFix(locations, title)
 endfunction
 
-function! OmniSharp#RunTest() abort
-  if !s:GuardStdio() | return | endif
+function! OmniSharp#RunTest(mode) abort
+  "if !s:GuardStdio() | return | endif
   if g:OmniSharp_translate_cygwin_wsl
     echohl WarningMsg
     echom 'Tests do not work in WSL unfortunately'
     echohl None
     return
   endif
-  call OmniSharp#stdio#RunTest(bufnr('%'), function('s:CBRunTest'))
+  if g:OmniSharp_server_stdio
+    call OmniSharp#stdio#RunTest(bufnr('%'), function('s:CBRunTest'))
+  else
+    let b:buildcommand = OmniSharp#py#eval('buildcommand()')[0]['text']
+    if OmniSharp#CheckPyError() | return | endif
+    if a:mode !=# 'last'
+      let s:testcommand = OmniSharp#py#eval('getTestCommand("single")')
+    endif
+    if OmniSharp#CheckPyError() | return | endif
+    let s:cmdheight=&cmdheight
+    set cmdheight=5
+    let b:dispatch = b:buildcommand . ' && ' . s:testcommand
+    if executable('sed')
+      "" don't match on <filename unknown>:0
+      "let b:dispatch .= ' | sed "s/:0//"'
+      "let b:dispatch .= ' '
+    endif
+    let &l:makeprg=b:dispatch
+    set errorformat=%E%m\ in\ %#%f:line\ %l
+    set errorformat+=%+W%n\)\ Ignored\ :%m
+
+    if has("nvim")
+      Neomake!
+    else
+      Make
+    endif
+    let &cmdheight = s:cmdheight
+  endif
 endfunction
 
 function! s:CBRunTest(summary) abort

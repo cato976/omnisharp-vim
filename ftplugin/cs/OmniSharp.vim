@@ -47,7 +47,7 @@ command! -buffer -bar OmniSharpRename call OmniSharp#Rename()
 command! -buffer -nargs=1 OmniSharpRenameTo call OmniSharp#RenameTo(<q-args>)
 command! -buffer -bar OmniSharpRestartAllServers call OmniSharp#RestartAllServers()
 command! -buffer -bar OmniSharpRestartServer call OmniSharp#RestartServer()
-command! -buffer -bar OmniSharpRunTest call OmniSharp#RunTest()
+command! -buffer -bar OmniSharpRunTest call OmniSharp#RunTest('single')
 command! -buffer -bar -nargs=* -complete=file OmniSharpRunTestsInFile call OmniSharp#RunTestsInFile(<f-args>)
 command! -buffer -bar OmniSharpSignatureHelp call OmniSharp#SignatureHelp()
 command! -buffer -bar -nargs=? -complete=file OmniSharpStartServer call OmniSharp#StartServer(<q-args>)
@@ -121,6 +121,7 @@ let b:undo_ftplugin .= '
 \|  delcommand OmniSharpRenameTo
 \|  delcommand OmniSharpRestartAllServers
 \|  delcommand OmniSharpRestartServer
+\|  delcommand OmniSharpBuildAsync
 \|  delcommand OmniSharpRunTest
 \|  delcommand OmniSharpRunTestsInFile
 \|  delcommand OmniSharpSignatureHelp
