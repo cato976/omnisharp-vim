@@ -8,7 +8,7 @@ import vim  # pylint: disable=import-error
 from .util import VimUtilCtx
 from .util import find_free_port as util_find_free_port
 from .util import (formatPathForClient, formatPathForServer, getResponse,
-                   quickfixes_from_response)
+                   quickfixes_from_response, doRequest)
 from .vimcmd import vimcmd
 
 logger = logging.getLogger('omnisharp')
@@ -18,9 +18,9 @@ ctx = VimUtilCtx(vim)
 
 
 def openFile(filename, line=0, column=0, noautocmd=0):
-    cmd = "call OmniSharp#JumpToLocation('{0}', {1}, {2}, {3})" \
-          .format(filename, line, column, noautocmd)
-    vim.command(cmd)
+    vim.command("let l:loc = {{ 'filename': '{0}', 'lnum': {1}, 'col': {2} }}"
+                .format(filename, line, column))
+    vim.command("call OmniSharp#JumpToLocation(l:loc, {0})".format(noautocmd))
 
 
 def setBuffer(text):
@@ -30,39 +30,35 @@ def setBuffer(text):
     lines = text.splitlines()
     lines = [line.encode('utf-8') for line in lines]
     vim.current.buffer[:] = lines
-    vim.current.window.cursor = pos
+    try:
+        vim.current.window.cursor = pos
+    except vim.error:
+        vim.current.window.cursor = (len(vim.current.buffer), pos[1])
     return True
 
 
 @vimcmd
 def findUsages():
-    parameters = {}
-    parameters['MaxWidth'] = int(vim.eval('g:OmniSharp_quickFixLength'))
-    response = getResponse(ctx, '/findusages', parameters, json=True)
+    response = getResponse(ctx, '/findusages', json=True)
     return quickfixes_from_response(ctx, response['QuickFixes'])
 
 
 @vimcmd
 def findMembers():
-    parameters = {}
-    parameters['MaxWidth'] = int(vim.eval('g:OmniSharp_quickFixLength'))
-    response = getResponse(ctx, '/currentfilemembersasflat', parameters,
-                           json=True)
+    response = getResponse(ctx, '/currentfilemembersasflat', json=True)
     return quickfixes_from_response(ctx, response)
 
 
 @vimcmd
 def findImplementations():
-    parameters = {}
-    parameters['MaxWidth'] = int(vim.eval('g:OmniSharp_quickFixLength'))
-    response = getResponse(ctx, '/findimplementations', parameters, json=True)
+    response = getResponse(ctx, '/findimplementations', json=True)
     return quickfixes_from_response(ctx, response['QuickFixes'])
 
 
 @vimcmd
 def getCompletions(partialWord):
     parameters = {}
-    parameters['wordToComplete'] = partialWord
+    parameters['WordToComplete'] = partialWord
 
     parameters['WantDocumentationForEveryCompletionResult'] = \
         bool(int(vim.eval('g:omnicomplete_fetch_full_documentation')))
@@ -71,20 +67,27 @@ def getCompletions(partialWord):
         bool(int(vim.eval('g:OmniSharp_want_snippet')))
 
     parameters['WantSnippet'] = want_snippet
-    parameters['WantMethodHeader'] = want_snippet
-    parameters['WantReturnType'] = want_snippet
+    parameters['WantMethodHeader'] = True
+    parameters['WantReturnType'] = True
 
     response = getResponse(ctx, '/autocomplete', parameters, json=True)
 
     vim_completions = []
     if response is not None:
-        for completion in response:
+        for cmp in response:
+            if want_snippet:
+                word = cmp['MethodHeader'] or cmp['CompletionText']
+                menu = cmp['ReturnType'] or cmp['DisplayText']
+            else:
+                word = cmp['CompletionText'] or cmp['MethodHeader']
+                menu = cmp['DisplayText'] or cmp['MethodHeader']
+                menu = ' '.join(filter(None, [cmp['ReturnType'], menu]))
+
             vim_completions.append({
-                'snip': completion['Snippet'] or '',
-                'word': (completion['MethodHeader']
-                         or completion['CompletionText']),
-                'menu': completion['ReturnType'] or completion['DisplayText'],
-                'info': ((completion['Description'] or ' ')
+                'snip': cmp['Snippet'] or '',
+                'word': word,
+                'menu': menu,
+                'info': ((cmp['Description'] or ' ')
                          .replace('\r\n', '\n')),
                 'icase': 1,
                 'dup': 1
@@ -96,10 +99,9 @@ def getCompletions(partialWord):
 def gotoDefinition():
     definition = getResponse(ctx, '/gotodefinition', json=True)
     if definition.get('FileName'):
-        filename = formatPathForClient(ctx, definition['FileName'].replace("'", "''"))
-        openFile(filename, definition['Line'], definition['Column'])
+        return quickfixes_from_response(ctx, [definition])[0]
     else:
-        print("Not found")
+        return None
 
 
 @vimcmd
@@ -117,15 +119,19 @@ def runCodeAction(mode, action):
     changes = response.get('Changes')
     if changes:
         bufname = vim.current.buffer.name
+        bufnum = vim.current.buffer.number
         pos = vim.current.window.cursor
+        vim.command('let l:hidden_bak = &hidden | set hidden')
         for changeDefinition in changes:
-            filename = formatPathForClient(ctx,
-                                           changeDefinition['FileName'])
+            filename = formatPathForClient(ctx, changeDefinition['FileName'])
             openFile(filename, noautocmd=1)
             if not setBuffer(changeDefinition.get('Buffer')):
                 for change in changeDefinition.get('Changes', []):
                     setBuffer(change.get('NewText'))
+            if vim.current.buffer.number != bufnum:
+                vim.command('silent write | silent edit')
         openFile(bufname, pos[0], pos[1], 1)
+        vim.command('let &hidden = l:hidden_bak | unlet l:hidden_bak')
         return True
     return False
 
@@ -135,6 +141,13 @@ def codeActionParameters(mode):
     if mode == 'visual':
         start = vim.eval('getpos("\'<")')
         end = vim.eval('getpos("\'>")')
+        # In visual line mode, getpos("'>")[2] is a large number (2147483647).
+        # In python this is represented as a string, so when the length of this
+        # string is greater than 5 it means the position is greater than 99999.
+        # In this case, use the length of the line as the column position.
+        if len(end[2]) > 5:
+            end[2] = vim.eval('len(getline(%s))' % end[1])
+        logger.error(end)
         parameters['Selection'] = {
             'Start': {'Line': start[1], 'Column': start[2]},
             'End': {'Line': end[1], 'Column': end[2]}
@@ -147,6 +160,11 @@ def codeCheck():
     response = getResponse(ctx, '/codecheck', json=True)
     return quickfixes_from_response(ctx, response['QuickFixes'])
 
+@vimcmd
+def globalCodeCheck():
+    parameters = {}
+    response = doRequest(ctx.host, '/codecheck', parameters, json=True)
+    return quickfixes_from_response(ctx, response['QuickFixes'])
 
 @vimcmd
 def signatureHelp():
@@ -172,9 +190,13 @@ def renameTo(name):
     }
     response = getResponse(ctx, '/rename', parameters, json=True)
     changes = response['Changes']
+    ret = []
     for change in changes:
-        change['FileName'] = formatPathForClient(ctx, change['FileName'])
-    return changes
+        ret.append({
+            'FileName': formatPathForClient(ctx, change['FileName']),
+            'Buffer': change['Buffer'],
+        })
+    return ret
 
 
 @vimcmd
@@ -201,23 +223,37 @@ def findSymbols(filter=''):
 
 
 @vimcmd
-def lookupAllUserTypes():
-    response = getResponse(ctx, '/findsymbols', {'filter': ''}, json=True)
-    qf = response.get('QuickFixes', [])
-    slnTypes = []
-    slnInterfaces = []
-    slnAttributes = []
-    for symbol in qf:
-        if symbol['Kind'] == 'Class':
-            slnTypes.append(symbol['Text'])
-            if symbol['Text'].endswith('Attribute'):
-                slnAttributes.append(symbol['Text'][:-9])
-        elif symbol['Kind'] == 'Interface':
-            slnInterfaces.append(symbol['Text'])
+def findHighlightTypes():
+    # Original buffer lines
+    bufferLines = ctx.buffer.split('\r\n')
+    response = getResponse(ctx, '/highlight', json=True)
+    highlights = response.get('Highlights', [])
+
+    identifierKinds = ['constant name', 'enum member name', 'field name',
+                       'identifier', 'local name', 'parameter name',
+                       'property name', 'static symbol']
+    interfaceKinds = ['interface name']
+    methodKinds = ['extension method name', 'method name']
+    typeKinds = ['class name', 'enum name', 'namespace name', 'struct name']
+
+    types = []
+    for hi in highlights:
+        lnum = hi['StartLine'] - 1
+        if lnum >= len(bufferLines):
+            # An error has occurred with invalid line endings - perhaps a
+            # combination of unix and dos line endings?
+            return {'error': 'Invalid buffer - check line endings'}
+        line = bufferLines[lnum]
+        types.append({
+            'kind': hi['Kind'],
+            'name': line[hi['StartColumn'] - 1:hi['EndColumn'] - 1]
+        })
+
     return {
-        'userTypes': ' '.join(slnTypes),
-        'userInterfaces': ' '.join(slnInterfaces),
-        'userAttributes': ' '.join(slnAttributes),
+        'identifiers': [t['name'] for t in types if t['kind'] in identifierKinds],
+        'interfaces': [t['name'] for t in types if t['kind'] in interfaceKinds],
+        'methods': [t['name'] for t in types if t['kind'] in methodKinds],
+        'types': [t['name'] for t in types if t['kind'] in typeKinds]
     }
 
 
